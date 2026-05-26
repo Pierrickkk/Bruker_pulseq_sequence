@@ -1,0 +1,92 @@
+# Pulseq sequence file
+# Created by PyPulseq
+
+[VERSION]
+major 1
+minor 5
+revision 0
+
+[DEFINITIONS]
+AdcRasterTime 1e-07 
+BlockDurationRaster 1e-05 
+FOV 0.256 0.256 0.003 
+GradientRasterTime 1e-05 
+RadiofrequencyRasterTime 1e-06 
+TotalDuration 0.0141 
+
+# Format of blocks:
+# NUM DUR RF  GX  GY  GZ  ADC  EXT
+[BLOCKS]
+1 200   0   0   0   0  0  1
+2 317   1   0   0   1  0  0
+3  10   0   0   0   0  0  2
+4 100   0   2   3   4  0  0
+5  82   0   0   0   0  0  0
+6 324   0   5   0   0  1  0
+7 377   0   6   7   8  0  0
+
+# Format of RF events:
+# id ampl. mag_id phase_id time_shape_id center delay freqPPm phasePPM freq phase use
+# ..   Hz      ..       ..            ..     us    us     ppm  rad/MHz   Hz   rad  ..
+# Field "use" is the initial of: excitation refocusing inversion saturation preparation other undefined
+[RF]
+1      18.5185 1 2 3 1500 100 0 0 0 0 u
+
+# Format of trapezoid gradients:
+# id amplitude rise flat fall delay
+# ..      Hz/m   us   us   us    us
+[TRAP]
+ 1       444444  70 3000  70  30
+ 2      -147978 150  700 150   0
+ 3      -145349 140  720 140   0
+ 4      -842250 190  620 190   0
+ 5        78125  20 3200  20   0
+ 6  1.19048e+06 190  230 190   0
+ 7       145349 140  720 140   0
+ 8  1.19048e+06 190  930 190   0
+
+# Format of ADC events:
+# id num dwell delay freqPPM phasePPM freq phase phase_id
+# ..  ..    ns    us     ppm  rad/MHz   Hz   rad       ..
+[ADC]
+1 64 50000 20 0 0 0 0 0
+
+# Format of extension lists:
+# id type ref next_id
+# next_id of 0 terminates the list
+# Extension list is followed by extension specifications
+[EXTENSIONS]
+1 1 1 0
+2 1 2 0
+
+# Extension specification for digital output and input triggers:
+# id type channel delay (us) duration (us)
+extension TRIGGERS 1
+1 2 2 0 2000
+2 1 2 0 100
+
+# Sequence Shapes
+[SHAPES]
+
+shape_id 1
+num_samples 2
+1
+1
+
+shape_id 2
+num_samples 2
+0
+0
+
+shape_id 3
+num_samples 2
+0
+3000
+
+
+[SIGNATURE]
+# This is the hash of the Pulseq file, calculated right before the [SIGNATURE] section was added
+# It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
+# The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
+Type md5
+Hash 4a67012ea7e272deae1cf27d10b4ed4d

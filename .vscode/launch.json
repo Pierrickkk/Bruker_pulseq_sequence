@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: pulseq debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq",
+            "python": "/home/etudiant1/miniconda3/envs/pulseq_env/bin/python3.12",
+            "justMyCode": false
+        }
+    ]
+}

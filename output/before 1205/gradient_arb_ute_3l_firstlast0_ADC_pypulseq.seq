@@ -1,0 +1,150 @@
+# Pulseq sequence file
+# Created by PyPulseq
+
+[VERSION]
+major 1
+minor 5
+revision 0
+
+[DEFINITIONS]
+3D 1 
+AdcRasterTime 1e-07 
+BlockDurationRaster 1e-05 
+FOV 0.256 0.256 0.256 
+GradientRasterTime 1e-05 
+Name UTE_v1.2.1 
+RadiofrequencyRasterTime 1e-06 
+SGPoints 0 
+TR 5 
+TotalDuration 0.015 
+adc_dead_time 1e-05 
+alpha 0 
+dwell 1e-05 
+matrix 128 128 128 
+max_grad 1192128 
+max_slew 7.66368e+09 
+nDummy 100 
+nProj 10000 
+nSample 79 
+nSegment 1 
+reord_traj standard 
+rf_dead_time 0.0001 
+rf_len 5e-05 
+rf_ringdown_time 2e-05 
+rf_spoiling_inc 117 
+rise_time 0.0003 
+ro_os 1 
+ro_spoil 3 
+version_sequence v1.2.1 
+
+# Format of blocks:
+# NUM DUR RF  GX  GY  GZ  ADC  EXT
+[BLOCKS]
+1  17   1   0   0   0  0  0
+2 177   0   1   2   3  1  0
+3 306   0   0   0   0  0  0
+4  17   2   0   0   0  0  0
+5 177   0   4   5   6  2  0
+6 306   0   0   0   0  0  0
+7  17   3   0   0   0  0  0
+8 177   0   7   8   9  3  0
+9 306   0   0   0   0  0  0
+
+# Format of RF events:
+# id ampl. mag_id phase_id time_shape_id center delay freqPPm phasePPM freq phase use
+# ..   Hz      ..       ..            ..     us    us     ppm  rad/MHz   Hz   rad  ..
+# Field "use" is the initial of: excitation refocusing inversion saturation preparation other undefined
+[RF]
+1      555.556 1 2 3 25 100 0 0 0 0 u
+2      555.556 1 2 3 25 100 0 0 0 2.04204 u
+3      555.556 1 2 3 25 100 0 0 0 6.12611 u
+
+# Format of arbitrary gradients:
+#   time_shape_id of 0 means default timing (stepping with grad_raster starting at 1/2 of grad_raster)
+# id amplitude first last amp_shape_id time_shape_id delay
+# ..      Hz/m  Hz/m Hz/m        ..         ..          us
+[GRADIENTS]
+1       697336            0            0 4 0 0
+2      90282.8            0            0 4 0 0
+3      -937477           -0           -0 4 0 0
+4       690978            0            0 4 0 0
+5       131974            0            0 4 0 0
+6      -937242           -0           -0 4 0 0
+7       682134            0            0 4 0 0
+8       173209            0            0 4 0 0
+9      -937008           -0           -0 4 0 0
+
+# Format of ADC events:
+# id num dwell delay freqPPM phasePPM freq phase phase_id
+# ..  ..    ns    us     ppm  rad/MHz   Hz   rad       ..
+[ADC]
+1 79 10000 10 0 0 0 0 0
+2 79 10000 10 0 0 0 2.04204 0
+3 79 10000 10 0 0 0 6.12611 0
+
+# Sequence Shapes
+[SHAPES]
+
+shape_id 1
+num_samples 2
+1
+1
+
+shape_id 2
+num_samples 2
+0
+0
+
+shape_id 3
+num_samples 2
+0
+50
+
+shape_id 4
+num_samples 177
+0
+0.0111111
+0.0111111
+2
+0.0111112
+0.0111111
+0.0111111
+6
+0.0111112
+0.0111111
+0.0111111
+6
+0.0111112
+0.0111111
+0.0111111
+5
+0
+0
+47
+0.0606061
+0.0606061
+0
+0.060606
+0.0606061
+0.060606
+0.0606061
+0.0606061
+0
+0.060606
+0.0606061
+0.060606
+0.0606061
+0
+0
+68
+-0.0625
+-0.0625
+14
+
+
+[SIGNATURE]
+# This is the hash of the Pulseq file, calculated right before the [SIGNATURE] section was added
+# It can be reproduced/verified with md5sum if the file trimmed to the position right above [SIGNATURE]
+# The new line character preceding [SIGNATURE] BELONGS to the signature (and needs to be stripped away for recalculating/verification)
+Type md5
+Hash b1b1ea76a1ea64833bfdd54586cdbf0a

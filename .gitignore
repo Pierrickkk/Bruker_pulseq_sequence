@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+fid
+rawdata.job*
+2dseq
+
+.DS_Store
+
+*.dat
+*.nii
