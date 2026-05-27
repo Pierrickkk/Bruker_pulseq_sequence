@@ -18,9 +18,9 @@ FLAG_TIMING_CHECK = True  # toggle timing check (SlOW)
 FLAG_WRITE_SEQ = True  # toggle writing of seq-file
 # Define system limits
 system = pp.Opts(
-    max_grad=34,
+    max_grad=300,
     grad_unit='mT/m',
-    max_slew=100,
+    max_slew=2000,
     slew_unit='T/m/s',
     rf_ringdown_time=30e-6,
     rf_dead_time=100e-6,
@@ -33,14 +33,14 @@ system = pp.Opts(
 seq = pp.Sequence(system=system)
 
 # define geometry parameters
-fov = 220e-3
-n_x = 64
-n_y = 64
+fov = 30e-3
+n_x = 128
+n_y = 128
 res = fov / n_x  # spatial resolution [m]
-slice_thickness = 5e-3  # slice thickness [m]
+slice_thickness = 0.3e-3  # slice thickness [m]
 
 # define rf pulse parameters
-rf_angle = 10  # flip angle of excitation pulse [°]
+rf_angle = 20  # flip angle of excitation pulse [°]
 rf_duration = 1.28e-3  # duration of excitation pulse [s]
 rf_spoiling_inc = 117  # rf spoiling phase increment. Choose 0 to disable rf spoiling. [°]
 
@@ -169,8 +169,8 @@ assert final_TR.size == 1
 final_TR = final_TR.item()
 
 # define full filename
-filename = f'{time.strftime("%Y%m%d")}_mre_gre'
-filename += f'_{n_x}nx_{n_y}ny_{len(mre_exc_freq)}freqs'
+filename = f'{time.strftime("%Y%m%d")}_mre_gre_label'
+#filename += f'_{n_x}nx_{n_y}ny_{len(mre_exc_freq)}freqs'
 
 # create folder for seq and header file
 output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/output"
