@@ -14,13 +14,13 @@ FLAG_TRIG         = True
 FLAG_MRE_BIPOLAR  = True #false for unipolar meg
 FLAG_DWELL_BRUKER = True # True for dwell bruker friendly 
 
-fov = 60e-3  # Define FOV and resolution
+fov = 49.41e-3  # Define FOV and resolution
 Nx = 128
 Ny = Nx
 alpha = 90  # Flip angle
-slice_thickness = 1e-3  # Slice thickness
+slice_thickness = 2e-3  # Slice thickness
 n_slices = 1
-TE = 15e-3  # Echo time
+TE = 25e-3  # Echo time
 TR = 500e-3  # Repetition time
 
 rf_spoiling_inc = 117  # RF spoiling increment
@@ -33,9 +33,9 @@ spoiler_duration = 3e-3  # Spoiler duration
 # ======
 # MRE PARAMETERS
 # ======
-mre_exc_freq       = 1000.0        # single mechanical excitation frequency [Hz]
+mre_exc_freq       = 500.0        # single mechanical excitation frequency [Hz]
 mre_wave_period    = 1 / mre_exc_freq
-mre_n_timesteps    = 4            # number of phase offsets (time steps) over one wave period
+mre_n_timesteps    = 2            # number of phase offsets (time steps) over one wave period
 mre_meg_cycles     = 10             # number of MEG cycles (bipolar gradient pairs)
 mre_meg_orientations =  ['x']        #['x', 'y', 'z']
 mre_exp_number     = 10            # experiment number encoded in trigger pulse width
@@ -51,7 +51,7 @@ system = pp.Opts(
     adc_dead_time=100e-6,
     grad_raster_time=10e-6, # should be 8 ?
 )
-#if FLAG_DWELL_BRUKER:
+#if FLAG_BRUKER:
     #system.block_duration_raster = 10e-8
 if FLAG_DWELL_BRUKER:
     dwell_time = 20e-6
@@ -332,7 +332,7 @@ if FLAG_SHOW_PLOTS:
 
 if FLAG_WRITE_SEQ:
     output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/output"
-    seq_type = "2205"
+    seq_type = "2905"
 
     # Trigger
     if FLAG_TRIG:

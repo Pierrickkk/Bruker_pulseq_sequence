@@ -16,7 +16,7 @@ dwell_time = 20.1e-6  # Dwell time need to be a value from the list available he
 # for example 20e-6 or 20.1-6
 
 spoiler_duration = 3e-3  # Spoiler duration
-crush_duration = 0.5e-3  # Crusher duration
+crush_duration = 0.6e-3  # Crusher duration
 
 # Set system limits
 system = pp.Opts(
@@ -128,6 +128,11 @@ seq.add_block(gx_pre, pp.scale_grad(grad=gy_pre,scale=scale_area[1]), gz_reph)
 seq.add_block(gx, adc)
 seq.add_block(gx_spoil, pp.scale_grad(grad=gy_pre,scale=-scale_area[1]), gz_spoil)
 seq.add_block(pp.make_delay(delay_TR))
+for i in range(3):
+    
+    test2= pp.add_gradients(grads=[gx], system=system)
+    test =pp.add_gradients(grads=[test2,gx], system=system)
+    seq.add_block(test2)
 
 seq.add_block(rf, gz)
 
@@ -139,7 +144,7 @@ else:
     print('Timing check failed. Error listing follows:')
     [print(e) for e in error_report]
 
-seq.plot(label='lin', time_range=np.array([0, 1.1]) * TR, time_disp='ms',grad_disp='mT/m',show_blocks=True)
+seq.plot(label='lin', time_range=np.array([0, 3]) * TR, time_disp='ms',grad_disp='mT/m',show_blocks=True)
 
 
 seq = pp.Sequence(system)  # Create a new sequence object
@@ -161,6 +166,8 @@ for i in range(Ny):
     seq.add_block(gx, adc)
     seq.add_block(gx_spoil, pp.scale_grad(grad=gy_pre,scale=-scale_area[i]), gz_spoil)
     seq.add_block(pp.make_delay(delay_TR))
+   
+
 
 ok, error_report = seq.check_timing()
 
@@ -198,4 +205,4 @@ seq.set_definition(key='ro_duration', value=ro_duration)
 seq.set_definition(key='spoiler_duration', value=spoiler_duration)
 
 seq.set_definition(key='Name', value='bruker_SE')
-seq.write("bruker_SE_dwell")
+#seq.write("bruker_SE_dwell")
