@@ -7,7 +7,7 @@ Nx = 128
 Ny = Nx
 alpha = 90  # Flip angle
 slice_thickness = 0.3e-3  # Slice thickness
-n_slices = 1
+n_slices = 75
 TE = 10e-3  # Echo time
 TR = 1000e-3  # Repetition time
 
@@ -164,13 +164,15 @@ seq.set_definition(key='spoiler_duration', value=spoiler_duration)
 
 seq.set_definition(key='Name', value='bruker_gre_label')
 
-seq.plot()
-k_traj_adc, k_traj, *_ = seq.calculate_kspace()
-plt.figure()
-N3=64*34
-plt.plot(k_traj[0,1:N3*10], k_traj[1,1:N3*10], 'b')
-plt.plot(k_traj_adc[0,1:N3], k_traj_adc[1,1:N3], '.r', markersize=3)
-plt.title('k-space trajectory')
-plt.show()
+#seq.plot()
+#k_traj_adc, k_traj, *_ = seq.calculate_kspace()
+#plt.figure()
+#N3=64*34
+##plt.plot(k_traj[0,1:N3*10], k_traj[1,1:N3*10], 'b')
+#plt.plot(k_traj_adc[0,1:N3], k_traj_adc[1,1:N3], '.r', markersize=3)
+#plt.title('k-space trajectory')
+#plt.show()
 
-seq.write("bruker_gre")
+output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/output"
+filename = "test_size_128_75_128"
+seq.write(output_path + "/" + filename)
