@@ -10,9 +10,9 @@ import pypulseq as pp
 # ======
 # FLAGS
 # ======
-FLAG_SHOW_PLOTS   = False
+FLAG_SHOW_PLOTS   = True
 FLAG_TEST_REPORT  = True
-FLAG_WRITE_SEQ    = True
+FLAG_WRITE_SEQ    = False
 
 FLAG_DWELL_BRUKER = True # True for dwell bruker friendly 
 
@@ -25,16 +25,16 @@ FLAG_MRE_BIPOLAR  = True #false for unipolar meg
 # ======
 # SEQUENCE PARAMETERS
 # ======
-fov = 30e-3
+fov = 60e-3
 Nx = 128
 Ny = 128
 
-n_echo = 1
+n_echo = 2
 n_slices = 1
 
 rf_flip_deg = 180
 
-slice_thickness = 0.3e-3
+slice_thickness = 1e-3
 
 TE = 20e-3
 TR = 1000e-3
@@ -46,10 +46,10 @@ output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/ou
 # ======
 # MRE PARAMETERS
 # ======
-mre_exc_freq       = 500.0        # single mechanical excitation frequency [Hz]
+mre_exc_freq       = 1000.0        # single mechanical excitation frequency [Hz]
 mre_wave_period    = 1 / mre_exc_freq
 mre_n_timesteps    = 1            # number of phase offsets (time steps) over one wave period
-mre_meg_cycles     = 3             # number of MEG cycles (bipolar gradient pairs)
+mre_meg_cycles     = 7           # number of MEG cycles (bipolar gradient pairs)
 mre_meg_orientations =  ['y']        #['x', 'y', 'z']
 mre_exp_number     = 10            # experiment number encoded in trigger pulse width
 
@@ -86,7 +86,7 @@ readout_time = sampling_time + 2 * system.adc_dead_time
 
 if FLAG_DWELL_BRUKER:
     dwell_time = 50e-6
-    readout_time = dwell_time * Nx # ADC duration
+    readout_time = (dwell_time * Nx)+ 2 * system.adc_dead_time # ADC duration
     readout_time=round(readout_time/system.block_duration_raster)*system.block_duration_raster
 
 t_ex = 2.5e-3
@@ -204,6 +204,7 @@ if FLAG_DWELL_BRUKER:
     adc_delay= gr_acq.rise_time + ( gr_acq.flat_time- readout_time)/2
     adc_delay = round(adc_delay/system.block_duration_raster)*system.block_duration_raster
     if (adc_delay<system.adc_dead_time):
+        print("adc dead time now")
         gx = pp.make_trapezoid(channel='x', flat_area=Nx * delta_kx, flat_time=readout_time, rise_time=system.adc_dead_time,system=system)
     adc = pp.make_adc(num_samples=Nx, dwell=dwell_time, delay=adc_delay, system=system)
 else:
@@ -429,8 +430,8 @@ if FLAG_MRE:
     total_meg_dur = pp.calc_duration(meg)
 else:
     total_meg_dur = 0
-if FLAG_TRIG:
-    trig_out = pp.make_digital_output_pulse('osc1', duration=100e-6, delay=0)
+
+trig_out = pp.make_digital_output_pulse('osc1', duration=100e-6, delay=0)
 
 # ======
 # TIMING
@@ -530,11 +531,8 @@ for n_dim, meg_orientation in enumerate(mre_meg_orientations):
                 # Excitation
                 seq.add_block(gs1)
                 seq.add_block(rf_ex, gs2)
-                if FLAG_MRE:
-                    
-                    
-                    seq.add_block(gs3,meg, gr3)
-
+                if FLAG_MRE:                    
+                    seq.add_block(gs3, meg, gr3)
                 else:
                     seq.add_block(gs3, gr3)
 
@@ -694,16 +692,16 @@ seq.set_definition(key='AdcDeadTime', value=system.adc_dead_time)
 # ======
 if FLAG_SHOW_PLOTS:
 
-    seq.plot(time_range=[0, 2 * TR])
+    seq.plot(time_range=[0, 5 * TR])
 
     k_traj_adc, k_traj, *_ = seq.calculate_kspace()
 
     plt.figure()
 
-    N3 = 64 * 34
-
-    plt.plot(k_traj[0, 1:N3 * 10],
-             k_traj[1, 1:N3 * 10],
+    N3 = 128*2
+    N2 = 30
+    plt.plot(k_traj[0, 1:N3 ],
+             k_traj[1, 1:N3 ],
              'b')
 
     plt.plot(k_traj_adc[0, 1:N3],
@@ -722,7 +720,7 @@ if FLAG_SHOW_PLOTS:
 if FLAG_WRITE_SEQ:
 
     filename = (
-        f"2905_MRERARE"
+        f"0906_RARE_pabruk"
         f"_{Nx}"
         f"_{int(fov * 1e3)}mm"
         f"_ETL{n_echo}"

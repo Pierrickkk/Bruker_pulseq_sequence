@@ -7,8 +7,8 @@ from pypulseq.make_trapezoid import make_trapezoid
 # ======
 # FLAGS
 # ======
-FLAG_SHOW_PLOTS   = False
-FLAG_WRITE_SEQ    = True
+FLAG_SHOW_PLOTS   = True
+FLAG_WRITE_SEQ    = False
 FLAG_MRE          = True
 FLAG_TRIG         = True
 FLAG_MRE_BIPOLAR  = True #false for unipolar meg
@@ -35,8 +35,8 @@ spoiler_duration = 3e-3  # Spoiler duration
 # ======
 mre_exc_freq       = 500.0        # single mechanical excitation frequency [Hz]
 mre_wave_period    = 1 / mre_exc_freq
-mre_n_timesteps    = 2            # number of phase offsets (time steps) over one wave period
-mre_meg_cycles     = 10             # number of MEG cycles (bipolar gradient pairs)
+mre_n_timesteps    = 1            # number of phase offsets (time steps) over one wave period
+mre_meg_cycles     = 3             # number of MEG cycles (bipolar gradient pairs)
 mre_meg_orientations =  ['x']        #['x', 'y', 'z']
 mre_exp_number     = 10            # experiment number encoded in trigger pulse width
 
@@ -311,24 +311,24 @@ seq.set_definition(key='ro_duration', value=ro_duration)
 seq.set_definition(key='spoiler_duration', value=spoiler_duration)
 
 # MRE parameters
-#if FLAG_MRE:
-    #seq.set_definition(key='mre_exc_freq', value=mre_exc_freq)
-    #seq.set_definition(key='mre_n_timesteps', value=mre_n_timesteps)
-    #seq.set_definition(key='mre_meg_cycles', value=mre_meg_cycles)
-    #seq.set_definition(key='mre_meg_orientations', value=mre_meg_orientations)
-    #seq.set_definition(key='mre_exp_number', value=mre_exp_number)
+if FLAG_MRE:
+    seq.set_definition(key='mre_exc_freq', value=mre_exc_freq)
+    seq.set_definition(key='mre_n_timesteps', value=mre_n_timesteps)
+    seq.set_definition(key='mre_meg_cycles', value=mre_meg_cycles)
+    seq.set_definition(key='mre_meg_orientations', value=mre_meg_orientations)
+    seq.set_definition(key='mre_exp_number', value=mre_exp_number)
 
 seq.set_definition(key='Name', value='bruker_gre_label')
 if FLAG_SHOW_PLOTS:
     #seq.plot(label='lin', time_range=np.array([0, 3]) * TR, time_disp='ms',grad_disp='mT/m')
     #seq.plot(time_range=np.array([0, 0.02]))
-    seq.plot()
-    #k_traj_adc, k_traj, *_ = seq.calculate_kspace()
-    #plt.figure()
-    #plt.plot(k_traj[0], k_traj[1], 'b')
-    #plt.plot(k_traj_adc[0], k_traj_adc[1], '.r', markersize=3)
-    #plt.title('k-space trajectory')
-    #plt.show()
+    #seq.plot()
+    k_traj_adc, k_traj, *_ = seq.calculate_kspace()
+    plt.figure()
+    plt.plot(k_traj[0], k_traj[1], 'b')
+    plt.plot(k_traj_adc[0,1:128*3], k_traj_adc[1,1:128*3], '.r', markersize=3)
+    plt.title('k-space trajectory')
+    plt.show()
 
 if FLAG_WRITE_SEQ:
     output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/output"

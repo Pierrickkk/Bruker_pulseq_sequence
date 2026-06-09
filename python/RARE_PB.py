@@ -10,9 +10,9 @@ import pypulseq as pp
 # ======
 # FLAGS
 # ======
-FLAG_SHOW_PLOTS   = False
+FLAG_SHOW_PLOTS   = True
 FLAG_TEST_REPORT  = True
-FLAG_WRITE_SEQ    = True
+FLAG_WRITE_SEQ    = False
 
 FLAG_DWELL_BRUKER = True # True for dwell bruker friendly 
 
@@ -520,10 +520,10 @@ if FLAG_SHOW_PLOTS:
 
     plt.figure()
 
-    N3 = 64 * 34
+    N3 = 128 * 128
 
-    plt.plot(k_traj[0, 1:N3 * 10],
-             k_traj[1, 1:N3 * 10],
+    plt.plot(k_traj[0, 1:N3 ],
+             k_traj[1, 1:N3 ],
              'b')
 
     plt.plot(k_traj_adc[0, 1:N3],

@@ -5,7 +5,7 @@ import numpy as np
 import pypulseq as pp
 
 FLAG_PLOT = True
-FLAG_WRITE_SEQ = True
+FLAG_WRITE_SEQ = False
 
 
 seq_filename = "sinc_arbitraryRF_noscaling_bruker.seq"

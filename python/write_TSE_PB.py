@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pypulseq as pp
 
-
+## ce code fonctionne cette tse est adapté à bruker et à l'interpréteur
 def main(
-    plot: bool = True,
+    plot: bool = True,  
     test_report: bool = False,
     write_seq: bool = False,
     seq_filename: str = 'tse_echo1_pypulseq.seq',
@@ -327,7 +327,7 @@ def main(
         seq.plot()
         k_traj_adc, k_traj, *_ = seq.calculate_kspace()
         plt.figure()
-        N3=64*34
+        N3=128*128
         plt.plot(k_traj[0,1:N3*10], k_traj[1,1:N3*10], 'b')
         plt.plot(k_traj_adc[0,1:N3], k_traj_adc[1,1:N3], '.r', markersize=3)
         plt.title('k-space trajectory')
