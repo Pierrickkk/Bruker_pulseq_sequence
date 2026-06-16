@@ -10,9 +10,9 @@ import pypulseq as pp
 # ======
 # FLAGS
 # ======
-FLAG_SHOW_PLOTS   = False
+FLAG_SHOW_PLOTS   = True
 FLAG_TEST_REPORT  = True
-FLAG_WRITE_SEQ    = True
+FLAG_WRITE_SEQ    = False
 
 FLAG_DWELL_BRUKER = True # True for dwell bruker friendly 
 
@@ -29,7 +29,7 @@ fov = 60e-3
 Nx = 128
 Ny = 128
 
-n_echo = 1
+n_echo = 8
 
 n_slices = 1
 
@@ -47,7 +47,7 @@ output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/ou
 # ======
 # MRE PARAMETERS
 # ======
-mre_exc_freq       = 500.0        # single mechanical excitation frequency [Hz]
+mre_exc_freq       = 1000.0        # single mechanical excitation frequency [Hz]
 mre_wave_period    = 1 / mre_exc_freq
 mre_n_timesteps    = 1            # number of phase offsets (time steps) over one wave period
 mre_meg_cycles     = 3           # number of MEG cycles (bipolar gradient pairs)
@@ -87,7 +87,8 @@ readout_time = sampling_time + 2 * system.adc_dead_time
 
 if FLAG_DWELL_BRUKER:
     dwell_time = 50e-6
-    readout_time = (dwell_time * Nx)+ 2 * system.adc_dead_time # ADC duration
+    sampling_time = dwell_time * Nx
+    readout_time = sampling_time+ 2 * system.adc_dead_time # ADC duration
     readout_time=round(readout_time/system.block_duration_raster)*system.block_duration_raster
 
 t_ex = 2.5e-3
@@ -202,11 +203,11 @@ gr_acq = pp.make_trapezoid(
     rise_time=dG,
 )
 if FLAG_DWELL_BRUKER:
-    adc_delay= gr_acq.rise_time + ( gr_acq.flat_time- readout_time)/2
+    adc_delay= ( gr_acq.flat_time- readout_time)/2
     adc_delay = round(adc_delay/system.block_duration_raster)*system.block_duration_raster
     if (adc_delay<system.adc_dead_time):
         print("adc dead time now")
-        gx = pp.make_trapezoid(channel='x', flat_area=Nx * delta_kx, flat_time=readout_time, rise_time=system.adc_dead_time,system=system)
+        adc_delay = system.adc_dead_time
     adc = pp.make_adc(num_samples=Nx, dwell=dwell_time, delay=adc_delay, system=system)
 else:
     adc = pp.make_adc(num_samples=Nx, duration=sampling_time, delay=system.adc_dead_time, system=system)
@@ -693,13 +694,13 @@ seq.set_definition(key='AdcDeadTime', value=system.adc_dead_time)
 # ======
 if FLAG_SHOW_PLOTS:
 
-    seq.plot(time_range=[0, 5 * TR])
+    #seq.plot(time_range=[0, 5 * TR])
 
     k_traj_adc, k_traj, *_ = seq.calculate_kspace()
 
     plt.figure()
 
-    N3 = 128*2
+    N3 = 128*n_echo*2*35+1
     N2 = 30
     plt.plot(k_traj[0, 1:N3 ],
              k_traj[1, 1:N3 ],
