@@ -7,14 +7,14 @@ from pypulseq.make_trapezoid import make_trapezoid
 # ======
 # FLAGS
 # ======
-FLAG_SHOW_PLOTS   = True
-FLAG_WRITE_SEQ    = False
+FLAG_SHOW_PLOTS   = False
+FLAG_WRITE_SEQ    = True
 FLAG_MRE          = True
 FLAG_TRIG         = True
 FLAG_MRE_BIPOLAR  = True #false for unipolar meg
 FLAG_DWELL_BRUKER = True # True for dwell bruker friendly 
 
-fov = 49.41e-3  # Define FOV and resolution
+fov = 60e-3  # Define FOV and resolution
 Nx = 128
 Ny = Nx
 alpha = 90  # Flip angle
@@ -33,11 +33,11 @@ spoiler_duration = 3e-3  # Spoiler duration
 # ======
 # MRE PARAMETERS
 # ======
-mre_exc_freq       = 500.0        # single mechanical excitation frequency [Hz]
+mre_exc_freq       = 1000.0        # single mechanical excitation frequency [Hz]
 mre_wave_period    = 1 / mre_exc_freq
 mre_n_timesteps    = 1            # number of phase offsets (time steps) over one wave period
-mre_meg_cycles     = 3             # number of MEG cycles (bipolar gradient pairs)
-mre_meg_orientations =  ['x']        #['x', 'y', 'z']
+mre_meg_cycles     = 7             # number of MEG cycles (bipolar gradient pairs)
+mre_meg_orientations =  ['y']        #['x', 'y', 'z']
 mre_exp_number     = 10            # experiment number encoded in trigger pulse width
 
 # Set system limits
@@ -332,7 +332,7 @@ if FLAG_SHOW_PLOTS:
 
 if FLAG_WRITE_SEQ:
     output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/output"
-    seq_type = "2905"
+    seq_type = "1506_GRE"
 
     # Trigger
     if FLAG_TRIG:

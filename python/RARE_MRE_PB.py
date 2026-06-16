@@ -10,9 +10,9 @@ import pypulseq as pp
 # ======
 # FLAGS
 # ======
-FLAG_SHOW_PLOTS   = True
+FLAG_SHOW_PLOTS   = False
 FLAG_TEST_REPORT  = True
-FLAG_WRITE_SEQ    = False
+FLAG_WRITE_SEQ    = True
 
 FLAG_DWELL_BRUKER = True # True for dwell bruker friendly 
 
@@ -29,7 +29,8 @@ fov = 60e-3
 Nx = 128
 Ny = 128
 
-n_echo = 2
+n_echo = 1
+
 n_slices = 1
 
 rf_flip_deg = 180
@@ -46,10 +47,10 @@ output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/ou
 # ======
 # MRE PARAMETERS
 # ======
-mre_exc_freq       = 1000.0        # single mechanical excitation frequency [Hz]
+mre_exc_freq       = 500.0        # single mechanical excitation frequency [Hz]
 mre_wave_period    = 1 / mre_exc_freq
 mre_n_timesteps    = 1            # number of phase offsets (time steps) over one wave period
-mre_meg_cycles     = 7           # number of MEG cycles (bipolar gradient pairs)
+mre_meg_cycles     = 3           # number of MEG cycles (bipolar gradient pairs)
 mre_meg_orientations =  ['y']        #['x', 'y', 'z']
 mre_exp_number     = 10            # experiment number encoded in trigger pulse width
 
@@ -674,7 +675,7 @@ seq.set_definition(key='FLAG_MRE_BIPOLAR', value=int(FLAG_MRE_BIPOLAR))
 seq.set_definition(key='FOV', value=[fov, fov, slice_thickness * n_slices])
 seq.set_definition(key='Name', value='tse')
 
-seq.set_definition(key='matrix', value=[Nx, Ny, n_slices])
+seq.set_definition(key='Matrix', value=[Nx, Ny, n_slices])
 
 seq.set_definition(key='nslices', value=n_slices)
 seq.set_definition(key='n_echo', value=n_echo)
@@ -720,7 +721,7 @@ if FLAG_SHOW_PLOTS:
 if FLAG_WRITE_SEQ:
 
     filename = (
-        f"0906_RARE_pabruk"
+        f"1506_RARE"
         f"_{Nx}"
         f"_{int(fov * 1e3)}mm"
         f"_ETL{n_echo}"

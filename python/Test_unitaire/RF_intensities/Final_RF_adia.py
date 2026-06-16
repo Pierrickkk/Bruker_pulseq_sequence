@@ -5,55 +5,14 @@ from scipy.interpolate import interp1d
 import pypulseq as pp
 
 FLAG_PLOT = True
-FLAG_WRITE_SEQ = True  
+FLAG_WRITE_SEQ = True
 
-seq_filename = "rf9_adia_exc_scaled_pleins.seq"
+seq_filename = "shape7_rf.seq"
 
-filename_inv = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/shape/sech.inv"
-filename_exc = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/shape/sech.exc"
-
-
-mag = []
-phase_deg = []
-phase_rad = []
-magphase_rad = []
-rf_complex = []
-rf_complex2 = []
-
-sum_reel = 0
-sum_imag = 0
-with open(filename_exc, "r") as f:
-    start = False
-
-    for line in f:
-        line = line.strip()
-
-        if "##XYPOINTS=" in line:
-            start = True
-            continue
-
-        if not start or not line:
-            continue
-
-        try:
-            xi, yi = line.split(",")
-            mag.append(float(xi))
-            phase_deg.append(float(yi))
-            phase_rad.append(np.deg2rad(float(yi)))
-            magphase_rad.append(float(xi))
-            magphase_rad.append(np.deg2rad(float(yi)))
-
-        except ValueError:
-            # fin des données ou ligne invalide
-            break
-
-
-for i in range(len(mag)):
-    signal_complex = mag[i]*(np.exp(1j*phase_rad[i]))
-    signal_complex2 =   mag[i]*(np.cos(phase_rad[i]))+1j*mag[i]*(np.sin(phase_rad[i]))
-    rf_complex.append(signal_complex)
-    rf_complex2.append(signal_complex2)
-
+filename_sech_inv = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/shape/sech.inv"
+filename_sech_exc = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/shape/sech.exc"
+filename_sinc_exc = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/shape/sinc.exc"
+filename_sinc_inv = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/shape/sinc.inv"
 
 # ======
 # SETUP
@@ -83,30 +42,153 @@ system = pp.Opts(
 
 seq = pp.Sequence(system)
 
-old_duration = len(rf_complex) * system.rf_raster_time
-new_duration = 6e-3
+def load_and_stretch_rf(filename: str, rf_raster_time: float, new_duration: float = None) -> tuple:
+    """
+    Parse a Bruker .exc file and optionally time-stretch the RF pulse.
 
-scale = new_duration / old_duration
-n_new = int(round(len(rf_complex) * scale))
+    Parameters
+    ----------
+    filename : str
+        Path to the .exc file.
+    rf_raster_time : float
+        Dwell time per sample in seconds (e.g. system.rf_raster_time).
+    new_duration : float, optional
+        Target pulse duration in seconds. Prompts the user if None.
 
-rf_complex = np.asarray(rf_complex)
+    Returns
+    -------
+    rf_complex : np.ndarray
+        Original complex RF signal (mag * exp(j*phase)).
+    rf_complex_stretched : np.ndarray
+        Time-stretched complex RF signal resampled to new_duration.
+    new_duration : float
+        The target duration actually used.
+    """
+    mag, phase_rad = [], []
 
-x_old = np.linspace(0, 1, len(rf_complex))
-x_new = np.linspace(0, 1, n_new)
+    with open(filename, "r") as f:
+        start = False
+        for line in f:
+            line = line.strip()
+            if "##XYPOINTS=" in line:
+                start = True
+                continue
+            if not start or not line:
+                continue
+            try:
+                xi, yi = line.split(",")
+                mag.append(float(xi))
+                phase_rad.append(np.deg2rad(float(yi)))
+            except ValueError:
+                break  # end of data block
 
-f_real = interp1d(x_old, np.real(rf_complex), kind='cubic')
-f_imag = interp1d(x_old, np.imag(rf_complex), kind='cubic')
+    rf_complex = np.array(mag) * np.exp(1j * np.array(phase_rad))
 
-rf_complex_stretched = (
-    f_real(x_new) +
-    1j * f_imag(x_new)
+    if new_duration is None:
+        old_duration = len(rf_complex) * rf_raster_time
+        new_duration = float(input(
+            f"Original duration: {old_duration * 1e3:.3f} ms ? enter new duration (ms): "
+        )) * 1e-3
+
+    n_new = int(round(len(rf_complex) * new_duration / (len(rf_complex) * rf_raster_time)))
+    x_old = np.linspace(0, 1, len(rf_complex))
+    x_new = np.linspace(0, 1, n_new)
+
+    rf_complex_stretched = (
+        interp1d(x_old, np.real(rf_complex), kind="cubic")(x_new)
+        + 1j * interp1d(x_old, np.imag(rf_complex), kind="cubic")(x_new)
+    )
+
+    return rf_complex, rf_complex_stretched, new_duration
+
+
+def read_bruker_header(filename):
+    params = {}
+    with open(filename) as f:
+        for line in f:
+            line = line.strip()
+            for key in ["SHAPE_INTEGFAC", "SHAPE_BWFAC", "SHAPE_TOTROT"]:
+                if line.startswith(f"##${key}="):
+                    params[key] = float(line.split("=")[1])
+    return params
+
+# Bruker hard pulse reference: 90° in 1ms
+# On Bruker systems, the reference B1 for a 1ms hard 90° pulse
+# is typically calibrated and stored. In pypulseq units (Hz = cycles/s):
+gamma_hz_per_T = 42.577e6  # Hz/T
+
+# Reference: hard pulse 90° in 1ms ? B1_ref in Tesla
+flip_ref = np.pi / 2          # 90°
+dur_ref  = 1e-3               # 1 ms
+B1_ref   = flip_ref / (2 * np.pi * gamma_hz_per_T * dur_ref)
+# B1_ref ? 5.87e-6 T  ? 5.87 µT ? 250 Hz in flip-angle-rate units
+def compute_bruker_peak_b1(flip_angle_rad, duration_s, integfac, B1_ref, dur_ref=1e-3):
+    """
+    Bruker scaling formula:
+      B1_peak = B1_ref × (flip/90°) × (dur_ref/duration) × (1/integfac)
+    
+    integfac : SHAPE_INTEGFAC from the .exc header (normalized integral)
+    """
+    return B1_ref * (flip_angle_rad / (np.pi/2)) * (dur_ref / duration_s) * (1.0 / integfac)
+
+def scale_bruker_rf(signal_complex, flip_angle_rad, duration_s, integfac):
+    """
+    Returns the signal array scaled to match Bruker amplitude,
+    ready for make_arbitrary_rf with no_signal_scaling=True.
+    """
+    gamma_hz_per_T = 42.577e6
+    dur_ref  = 1e-3
+    flip_ref = np.pi / 2
+    B1_ref   = flip_ref / (2 * np.pi * gamma_hz_per_T * dur_ref)  # ~5.87e-6 T
+
+    B1_peak  = compute_bruker_peak_b1(flip_angle_rad, duration_s, integfac, B1_ref)
+    B1_peak_hz = B1_peak * gamma_hz_per_T  # convert T ? Hz
+
+    # signal is normalized: max(|signal|) = 1
+    signal_norm = signal_complex / np.max(np.abs(signal_complex))
+    return signal_norm * B1_peak_hz
+
+
+
+
+
+
+rf_complex, rf_stretched, dur = load_and_stretch_rf(
+    filename_sech_exc,
+    rf_raster_time=system.rf_raster_time,
+    new_duration=6e-3   # pass directly, or omit to be prompted
+)
+
+sinc_complex, sinc_stretched, dur = load_and_stretch_rf(
+    filename_sinc_exc,
+    rf_raster_time=system.rf_raster_time,
+    new_duration=6e-3   # pass directly, or omit to be prompted
+)
+
+
+
+
+header = read_bruker_header(filename_sinc_exc)
+integfac = header["SHAPE_INTEGFAC"]   # e.g. 0.4637 for a sinc
+
+flip = 90 * np.pi / 180
+dur  = 3e-6 * len(sinc_complex)       # original duration (dwell × n_points)
+
+signal_scaled = scale_bruker_rf(sinc_complex, flip, dur, integfac)
+
+sinc_bruk = pp.make_arbitrary_rf(
+    no_signal_scaling=False,
+    signal=signal_scaled,
+    dwell=3e-6,
+    flip_angle=flip,          # ignoré par pypulseq quand no_signal_scaling=True
+    delay=system.rf_dead_time
 )
 
 # ======
 # CREATE EVENTS
 # ======
 rf, gz, _ = pp.make_sinc_pulse(
-    flip_angle=alpha * math.pi / 180,
+    flip_angle=90 * math.pi / 180,
     duration=3e-3,
     slice_thickness=slice_thickness,
     #apodization=0.42,
@@ -115,25 +197,23 @@ rf, gz, _ = pp.make_sinc_pulse(
     return_gz=True,
     delay=system.rf_dead_time,
 )
-rf2 = pp.make_sinc_pulse(
-    flip_angle=(alpha+10) * math.pi / 180,
-    duration=15e-3,
-    slice_thickness=slice_thickness,
-    apodization=0.42,
-    time_bw_product=4,
-    system=system,
-    delay=system.rf_dead_time,
+
+sinc_bruk_inv = pp.make_arbitrary_rf(
+    no_signal_scaling=True,
+    signal=sinc_complex,
+    dwell=3e-6,
+    flip_angle=90* math.pi / 180,
+    delay=system.rf_dead_time
 )
 
-rf_adiabatic = pp.make_adiabatic_pulse(
-    adiabaticity=4,
-    pulse_type='hypsec',    duration=6e-3,
-    slice_thickness=slice_thickness,
-    #apodization=0.42,
-    use='undefined',
-    system=system,
-    delay=system.rf_dead_time,
-    )
+sinc_bruk_inv.signal = sinc_bruk_inv.signal * (np.pi/2)/(2*np.pi*0.16895*sinc_bruk_inv.shape_dur *2e-6*100)
+
+sinc_stretched_bruk_inv = pp.make_arbitrary_rf(
+    no_signal_scaling=False,
+    signal=sinc_stretched,
+    flip_angle=10* math.pi / 180,
+    delay=system.rf_dead_time
+)
 
 rf1_bruk_inv = pp.make_arbitrary_rf(
     no_signal_scaling=True,
@@ -143,11 +223,11 @@ rf1_bruk_inv = pp.make_arbitrary_rf(
     delay=system.rf_dead_time
 
 )
-rf1_bruk_inv.signal = rf1_bruk_inv.signal * (250 * (1e-3/6e-3) * 0.1064278)
+rf1_bruk_inv.signal = rf1_bruk_inv.signal * (2.50 * (1e-3/6e-3) * 0.1064278)
 
 rf2_bruk_inv = pp.make_arbitrary_rf(
     no_signal_scaling=True,
-    signal=rf_complex2,
+    signal=rf_complex,
     flip_angle=90* math.pi / 180,
     delay=system.rf_dead_time
 )
@@ -157,7 +237,7 @@ rf2_bruk_inv.signal = rf2_bruk_inv.signal * (250 * (1e-3/6e-3) * 0.1064278)  # s
 
 rf12_bruk_stretched_inv = pp.make_arbitrary_rf(
     no_signal_scaling=False,
-    signal=rf_complex_stretched,
+    signal=rf_stretched,
     flip_angle=90* math.pi / 180,
     delay=system.rf_dead_time
 
@@ -183,7 +263,7 @@ rf_inv_MB = pp.make_adiabatic_pulse(
     delay=system.rf_dead_time,
 )
 
-# Define other gradients and ADC events
+## Define other gradients and ADC events
 delta_k = 1 / fov
 gx = pp.make_trapezoid(channel='x', flat_area=Nx * delta_k, flat_time=3.2e-3, system=system)
 adc = pp.make_adc(num_samples=Nx, duration=gx.flat_time, delay=gx.rise_time, system=system)
@@ -231,19 +311,22 @@ for i in range(1):
     rf_inc = divmod(rf_inc + rf_spoiling_inc, 360.0)[1]
     rf_phase = divmod(rf_phase + rf_inc, 360.0)[1]
 
+
+    seq.add_block(sinc_bruk, gz,pp.make_delay(7e-3))
+    seq.add_block(pp.make_delay(0.1e-3))
     seq.add_block(rf, gz) 
     seq.add_block(pp.make_delay(0.1e-3))
-    seq.add_block(rf2, gz)
+    seq.add_block(sinc_bruk_inv, gz,pp.make_delay(7e-3))
     seq.add_block(pp.make_delay(0.1e-3))
-    seq.add_block(rf_adiabatic, gz)
+    seq.add_block(sinc_stretched_bruk_inv, gz,pp.make_delay(7e-3))
     seq.add_block(pp.make_delay(0.1e-3))
-    seq.add_block(rf2_bruk_inv, gz)
+    seq.add_block(rf2_bruk_inv, gz,pp.make_delay(7e-3))
     seq.add_block(pp.make_delay(0.1e-3))
     seq.add_block(rf1_bruk_inv, gz,pp.make_delay(7e-3))
     seq.add_block(pp.make_delay(0.1e-3))
     seq.add_block(rf12_bruk_stretched_inv, gz,pp.make_delay(7e-3))
     seq.add_block(pp.make_delay(0.1e-3))
-    seq.add_block(rf_inv_MB, gz)
+    seq.add_block(rf_inv_MB, gz,pp.make_delay(7e-3))
     seq.add_block(pp.make_delay(0.1e-3))
 
 
