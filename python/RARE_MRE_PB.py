@@ -12,7 +12,7 @@ import pypulseq as pp
 # ======
 FLAG_SHOW_PLOTS   = True
 FLAG_TEST_REPORT  = True
-FLAG_WRITE_SEQ    = False
+FLAG_WRITE_SEQ    = True
 
 FLAG_DWELL_BRUKER = True # True for dwell bruker friendly 
 
@@ -25,11 +25,11 @@ FLAG_MRE_BIPOLAR  = True #false for unipolar meg
 # ======
 # SEQUENCE PARAMETERS
 # ======
-fov = 60e-3
-Nx = 128
-Ny = 128
+fov = 25e-3
+Nx = 96
+Ny = 96
 
-n_echo = 8
+n_echo = 2
 
 n_slices = 1
 
@@ -38,7 +38,7 @@ rf_flip_deg = 180
 slice_thickness = 1e-3
 
 TE = 20e-3
-TR = 1000e-3
+TR = 800e-3
 
 
 output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/output"
@@ -47,10 +47,10 @@ output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/ou
 # ======
 # MRE PARAMETERS
 # ======
-mre_exc_freq       = 1000.0        # single mechanical excitation frequency [Hz]
+mre_exc_freq       = 1250.0        # single mechanical excitation frequency [Hz]
 mre_wave_period    = 1 / mre_exc_freq
 mre_n_timesteps    = 1            # number of phase offsets (time steps) over one wave period
-mre_meg_cycles     = 3           # number of MEG cycles (bipolar gradient pairs)
+mre_meg_cycles     = 8           # number of MEG cycles (bipolar gradient pairs)
 mre_meg_orientations =  ['y']        #['x', 'y', 'z']
 mre_exp_number     = 10            # experiment number encoded in trigger pulse width
 
@@ -433,7 +433,7 @@ if FLAG_MRE:
 else:
     total_meg_dur = 0
 
-trig_out = pp.make_digital_output_pulse('osc1', duration=100e-6, delay=0)
+trig_out = pp.make_digital_output_pulse('osc0', duration=100e-6, delay=0)
 
 # ======
 # TIMING
@@ -574,8 +574,12 @@ for n_dim, meg_orientation in enumerate(mre_meg_orientations):
 
                 seq.add_block(gs4)
                 seq.add_block(gs5)
-
-                seq.add_block(pp.make_delay(tr_delay))
+                if delay_timestep>0:
+                        if (tr_delay - delay_timestep)>0:
+                            seq.add_block(pp.make_delay(tr_delay - delay_timestep))
+                else:
+                    seq.add_block(pp.make_delay(tr_delay))
+                
                 if FLAG_MRE_BIPOLAR:
                     if FLAG_TRIG:
                         seq.add_block(trig_out)
@@ -627,9 +631,13 @@ for n_dim, meg_orientation in enumerate(mre_meg_orientations):
                 seq.add_block(gs4)
                 seq.add_block(gs5)
 
-                seq.add_block(pp.make_delay(tr_delay))
+                if delay_timestep>0:
+                        if (tr_delay - delay_timestep)>0:
+                            seq.add_block(pp.make_delay(tr_delay - delay_timestep))
+                else:
+                    seq.add_block(pp.make_delay(tr_delay))
 
-
+x
 # ======
 # TIMING CHECK
 # ======
@@ -694,7 +702,7 @@ seq.set_definition(key='AdcDeadTime', value=system.adc_dead_time)
 # ======
 if FLAG_SHOW_PLOTS:
 
-    #seq.plot(time_range=[0, 5 * TR])
+    seq.plot(time_range=[0, 5 * TR])
 
     k_traj_adc, k_traj, *_ = seq.calculate_kspace()
 
@@ -722,7 +730,7 @@ if FLAG_SHOW_PLOTS:
 if FLAG_WRITE_SEQ:
 
     filename = (
-        f"1506_RARE"
+        f"1606_souris_RARE"
         f"_{Nx}"
         f"_{int(fov * 1e3)}mm"
         f"_ETL{n_echo}"

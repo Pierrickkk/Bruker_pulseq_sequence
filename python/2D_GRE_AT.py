@@ -7,9 +7,9 @@ Nx = 128
 Ny = Nx
 alpha = 90  # Flip angle
 slice_thickness = 0.3e-3  # Slice thickness
-n_slices = 75
-TE = 10e-3  # Echo time
-TR = 1000e-3  # Repetition time
+n_slices = 1
+TE = 15e-3  # Echo time
+TR = 500e-3  # Repetition time
 
 rf_spoiling_inc = 117  # RF spoiling increment
 ro_duration = 3.2e-3  # ADC duration
@@ -174,5 +174,5 @@ seq.set_definition(key='Name', value='bruker_gre_label')
 #plt.show()
 
 output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/output"
-filename = "test_size_128_75_128"
+filename = "test_gre_mre"
 seq.write(output_path + "/" + filename)
