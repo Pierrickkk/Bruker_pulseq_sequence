@@ -14,7 +14,7 @@ def main(
     fov: float | tuple[float, float] = 256e-3,
     n_x: int = 64,
     n_y: int = 64,
-    n_echo: int = 64,
+    n_echo: int = 8,
     n_slices: int = 1,
     rf_flip_deg: int = 180,
     slice_thickness: float = 5e-3,
@@ -324,7 +324,7 @@ def main(
         seq.plot()
         k_traj_adc, k_traj, *_ = seq.calculate_kspace()
         plt.figure()
-        N3=64*34
+        N3=64*n_echo*3+1
         plt.plot(k_traj[0,1:N3*10], k_traj[1,1:N3*10], 'b')
         plt.plot(k_traj_adc[0,1:N3], k_traj_adc[1,1:N3], '.r', markersize=3)
         plt.title('k-space trajectory')

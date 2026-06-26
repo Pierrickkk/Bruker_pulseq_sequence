@@ -324,10 +324,10 @@ def main(
         print(seq.test_report())
 
     if plot:
-        seq.plot()
+        #seq.plot()
         k_traj_adc, k_traj, *_ = seq.calculate_kspace()
         plt.figure()
-        N3=128*128
+        N3=128*6
         plt.plot(k_traj[0,1:N3*10], k_traj[1,1:N3*10], 'b')
         plt.plot(k_traj_adc[0,1:N3], k_traj_adc[1,1:N3], '.r', markersize=3)
         plt.title('k-space trajectory')

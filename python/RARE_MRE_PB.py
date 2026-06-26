@@ -25,11 +25,12 @@ FLAG_MRE_BIPOLAR  = True #false for unipolar meg
 # ======
 # SEQUENCE PARAMETERS
 # ======
-fov = 25e-3
-Nx = 96
-Ny = 96
+fov = 60e-3
+Nx = 128
+Ny = Nx
 
 n_echo = 2
+
 
 n_slices = 1
 
@@ -38,7 +39,7 @@ rf_flip_deg = 180
 slice_thickness = 1e-3
 
 TE = 20e-3
-TR = 800e-3
+TR = 1000e-3
 
 
 output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/output"
@@ -47,10 +48,10 @@ output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/ou
 # ======
 # MRE PARAMETERS
 # ======
-mre_exc_freq       = 1250.0        # single mechanical excitation frequency [Hz]
+mre_exc_freq       = 500.0        # single mechanical excitation frequency [Hz]
 mre_wave_period    = 1 / mre_exc_freq
-mre_n_timesteps    = 1            # number of phase offsets (time steps) over one wave period
-mre_meg_cycles     = 8           # number of MEG cycles (bipolar gradient pairs)
+mre_n_timesteps    = 2            # number of phase offsets (time steps) over one wave period
+mre_meg_cycles     = 3           # number of MEG cycles (bipolar gradient pairs)
 mre_meg_orientations =  ['y']        #['x', 'y', 'z']
 mre_exp_number     = 10            # experiment number encoded in trigger pulse width
 
@@ -385,6 +386,7 @@ tt = rt + ft + meg_lobe_plus.fall_time
 
 times = [0]
 amps = [0]
+amps_neg = [0]
 
 current_t = 0
 
@@ -395,36 +397,49 @@ for i in range(mre_meg_cycles):
     current_t += rt
     times.append(current_t)
     amps.append(amp)
+    amps_neg.append(-amp)
 
     # flat
     current_t += ft
     times.append(current_t)
     amps.append(amp)
+    amps_neg.append(-amp)
 
     # ramp down
     current_t += rt
     times.append(current_t)
     amps.append(0)
+    amps_neg.append(0)
 
     # ramp up
     current_t += rt
     times.append(current_t)
     amps.append(-amp)
+    amps_neg.append(amp)
 
     # flat
     current_t += ft
     times.append(current_t)
     amps.append(-amp)
+    amps_neg.append(amp)
 
     # ramp down
     current_t += rt
     times.append(current_t)
     amps.append(0)
+    amps_neg.append(0)
 
 meg = pp.make_extended_trapezoid(
     channel='x',
     times=np.array(times),
     amplitudes=np.array(amps),
+    system=system,
+) 
+
+meg_neg = pp.make_extended_trapezoid(
+    channel='x',
+    times=np.array(times),
+    amplitudes=np.array(amps_neg),
     system=system,
 ) 
 
@@ -456,7 +471,7 @@ t_end = (
     + pp.calc_duration(gs5)
 )
 
-te_train = t_ex_calc + n_echo * t_ref_calc + t_end + total_meg_dur
+te_train = t_ex_calc + n_echo * t_ref_calc + t_end
 te_train = (
     system.grad_raster_time
     * np.round(te_train / system.grad_raster_time)
@@ -468,6 +483,17 @@ tr_delay = (
     * np.round(tr_delay / system.grad_raster_time)
 )
 
+
+
+if FLAG_TRIG:
+    assert np.all(math.ceil(te_train - trig_out.duration))
+    min_TR = math.ceil((tr_delay - trig_out.duration)/seq.grad_raster_time)*seq.grad_raster_time
+if FLAG_MRE:
+    assert np.all( TR == (np.ceil(TR / mre_wave_period) * mre_wave_period))
+    #tr_delay = np.ceil(TR / mre_wave_period) * mre_wave_period  # ensure TR is a multiple of the wave period
+    assert np.all((tr_delay // mre_wave_period) >= 1)
+
+
 if tr_delay < 0:
     tr_delay = 1e-3
     warnings.warn(
@@ -477,14 +503,6 @@ if tr_delay < 0:
 else:
     print(f'TR delay: {1000 * tr_delay} ms')
 
-
-if FLAG_TRIG:
-    assert np.all(math.ceil(te_train - trig_out.duration))
-    min_TR = math.ceil((tr_delay - trig_out.duration)/seq.grad_raster_time)*seq.grad_raster_time
-if FLAG_MRE:
-    tr_delay = np.ceil(tr_delay / mre_wave_period) * mre_wave_period  # ensure TR is a multiple of the wave period
-    assert np.all((tr_delay // mre_wave_period) >= 1)
-
 # ======
 # CONSTRUCT SEQUENCE
 # ======
@@ -493,6 +511,7 @@ for n_dim, meg_orientation in enumerate(mre_meg_orientations):
                  # make_label(type='SET', label='SET', value=n_dim))
 
     meg.channel = meg_orientation
+    meg_neg.channel = meg_orientation
 
     for idx_timesteps in range(mre_n_timesteps):
 
@@ -583,61 +602,68 @@ for n_dim, meg_orientation in enumerate(mre_meg_orientations):
                 if FLAG_MRE_BIPOLAR:
                     if FLAG_TRIG:
                         seq.add_block(trig_out)
-                # Excitation
-                if delay_timestep>0:
-                        seq.add_block(pp.make_delay(delay_timestep))
-                seq.add_block(gs1)
-                seq.add_block(rf_ex, gs2)
-                if FLAG_MRE:
-                    seq.add_block(gs3,meg, gr3)
+                    # Excitation
+                    if delay_timestep>0:
+                            seq.add_block(pp.make_delay(delay_timestep))
+                    seq.add_block(gs1)
+                    seq.add_block(rf_ex, gs2)
+                    if FLAG_MRE:
+                        seq.add_block(gs3,meg_neg, gr3)
 
-                else:
-                    seq.add_block(gs3, gr3)
-
-                # Echo train
-                for i_echo in range(n_echo):
-
-                    if i_excitation > 0:
-                        phase_area = phase_areas[i_echo, i_excitation - 1]
                     else:
-                        phase_area = 0.0
+                        seq.add_block(gs3, gr3)
 
-                    gp_pre = pp.make_trapezoid(
-                        channel='y',
-                        system=system,
-                        area=phase_area,
-                        duration=t_sp,
-                        rise_time=dG,
-                    )
+                    # Echo train
+                    for i_echo in range(n_echo):
+                        if i_excitation > 0:
+                            phase_area = phase_areas[i_echo, i_excitation - 1]
+                        else:
+                            phase_area = 0.0
 
-                    gp_rew = pp.make_trapezoid(
-                        channel='y',
-                        system=system,
-                        area=-phase_area,
-                        duration=t_sp,
-                        rise_time=dG,
-                    )
+                        gp_pre = pp.make_trapezoid(
+                            channel='y',
+                            system=system,
+                            area=phase_area,
+                            duration=t_sp,
+                            rise_time=dG,
+                        )
 
-                    seq.add_block(rf_ref, gs4)
-                    seq.add_block(gr5, gp_pre, gs5)
+                        gp_rew = pp.make_trapezoid(
+                            channel='y',
+                            system=system,
+                            area=-phase_area,
+                            duration=t_sp,
+                            rise_time=dG,
+                        )
 
-                    if i_excitation > 0:
-                        seq.add_block(gr6, adc)
-                    else:
-                        seq.add_block(gr6)
+                        seq.add_block(rf_ref, gs4)
+                        seq.add_block(gr5, gp_pre, gs5)
 
-                    seq.add_block(gr7, gp_rew, gs7)
+                        if i_excitation > 0:
+                            seq.add_block(gr6, adc)
+                        else:
+                            seq.add_block(gr6)
 
-                seq.add_block(gs4)
-                seq.add_block(gs5)
+                        seq.add_block(gr7, gp_rew, gs7)
 
-                if delay_timestep>0:
-                        if (tr_delay - delay_timestep)>0:
-                            seq.add_block(pp.make_delay(tr_delay - delay_timestep))
-                else:
-                    seq.add_block(pp.make_delay(tr_delay))
+                    seq.add_block(gs4)
+                    seq.add_block(gs5)
 
-x
+                    delay = tr_delay
+
+                    # retrieve the delay of the timestep
+                    if delay_timestep > 0:
+                        delay -= delay_timestep
+
+                    # if last echo you adapt TR so that the rf is 1 TR away 
+                    if i_excitation == n_ex:
+                        delay -= mre_wave_period / mre_n_timesteps
+
+                    seq.add_block(pp.make_delay(delay))
+        
+
+
+
 # ======
 # TIMING CHECK
 # ======
@@ -701,14 +727,13 @@ seq.set_definition(key='AdcDeadTime', value=system.adc_dead_time)
 # PLOTS
 # ======
 if FLAG_SHOW_PLOTS:
-
-    seq.plot(time_range=[0, 5 * TR])
-
+    seq.plot(time_range=[0, 10 * TR])
+    #seq.plot()
     k_traj_adc, k_traj, *_ = seq.calculate_kspace()
 
     plt.figure()
 
-    N3 = 128*n_echo*2*35+1
+    N3 = Ny*n_echo*4*2+1
     N2 = 30
     plt.plot(k_traj[0, 1:N3 ],
              k_traj[1, 1:N3 ],
@@ -721,8 +746,23 @@ if FLAG_SHOW_PLOTS:
 
     plt.title('k-space trajectory')
 
-    plt.show()
+    #plt.show()
 
+    rf90_times = []
+
+    t = 0.0
+
+    for i in range(1, len(seq.block_events) + 1):
+        block = seq.get_block(i)
+
+        if block.rf is not None:
+            if (block.rf.use =='excitation'):
+                rf90_times.append(t + block.rf.delay)
+
+        t += seq.block_durations[i]
+    for i in range (130):
+        #if (rf90_times[i+1]-rf90_times[i]> 1.00036):
+        print(rf90_times[i+1]-rf90_times[i])
 
 # ======
 # WRITE SEQUENCE
@@ -730,7 +770,7 @@ if FLAG_SHOW_PLOTS:
 if FLAG_WRITE_SEQ:
 
     filename = (
-        f"1606_souris_RARE"
+        f"test"
         f"_{Nx}"
         f"_{int(fov * 1e3)}mm"
         f"_ETL{n_echo}"
