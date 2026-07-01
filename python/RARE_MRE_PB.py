@@ -12,7 +12,7 @@ import pypulseq as pp
 # ======
 FLAG_SHOW_PLOTS   = True
 FLAG_TEST_REPORT  = True
-FLAG_WRITE_SEQ    = True
+FLAG_WRITE_SEQ    = False
 
 FLAG_DWELL_BRUKER = True # True for dwell bruker friendly 
 
@@ -29,7 +29,7 @@ fov = 60e-3
 Nx = 128
 Ny = Nx
 
-n_echo = 2
+n_echo = 4
 
 
 n_slices = 1
@@ -50,7 +50,7 @@ output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/ou
 # ======
 mre_exc_freq       = 500.0        # single mechanical excitation frequency [Hz]
 mre_wave_period    = 1 / mre_exc_freq
-mre_n_timesteps    = 2            # number of phase offsets (time steps) over one wave period
+mre_n_timesteps    = 4            # number of phase offsets (time steps) over one wave period
 mre_meg_cycles     = 3           # number of MEG cycles (bipolar gradient pairs)
 mre_meg_orientations =  ['y']        #['x', 'y', 'z']
 mre_exp_number     = 10            # experiment number encoded in trigger pulse width
@@ -727,7 +727,7 @@ seq.set_definition(key='AdcDeadTime', value=system.adc_dead_time)
 # PLOTS
 # ======
 if FLAG_SHOW_PLOTS:
-    seq.plot(time_range=[0, 10 * TR])
+    seq.plot(time_range=[2, 3])
     #seq.plot()
     k_traj_adc, k_traj, *_ = seq.calculate_kspace()
 
@@ -749,7 +749,7 @@ if FLAG_SHOW_PLOTS:
     #plt.show()
 
     rf90_times = []
-
+    rf_times = []
     t = 0.0
 
     for i in range(1, len(seq.block_events) + 1):
@@ -758,11 +758,16 @@ if FLAG_SHOW_PLOTS:
         if block.rf is not None:
             if (block.rf.use =='excitation'):
                 rf90_times.append(t + block.rf.delay)
+            else :
+                rf_times.append(t + block.rf.delay)
+        
 
         t += seq.block_durations[i]
-    for i in range (130):
+    #for i in range (259):
         #if (rf90_times[i+1]-rf90_times[i]> 1.00036):
-        print(rf90_times[i+1]-rf90_times[i])
+        #print(rf90_times[i+1]-rf90_times[i])
+        #print(rf_times[(i*2)+1]-rf_times[i*2])
+    
 
 # ======
 # WRITE SEQUENCE
@@ -770,7 +775,7 @@ if FLAG_SHOW_PLOTS:
 if FLAG_WRITE_SEQ:
 
     filename = (
-        f"test"
+        f"3006"
         f"_{Nx}"
         f"_{int(fov * 1e3)}mm"
         f"_ETL{n_echo}"
