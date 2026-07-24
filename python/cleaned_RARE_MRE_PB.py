@@ -16,9 +16,9 @@ FLAG_WRITE_SEQ    = True
 
 FLAG_DWELL_BRUKER = True # True for dwell bruker friendly 
 
-FLAG_MRE          = False
-FLAG_TRIG         = False
-FLAG_MRE_BIPOLAR  = False #false for unipolar meg
+FLAG_MRE          = True
+FLAG_TRIG         = True
+FLAG_MRE_BIPOLAR  = True #false for unipolar meg
 FLAG_LOOP_LABEL   = True # True for loop label in the sequence
 
 
@@ -29,7 +29,7 @@ fov = 50e-3
 Nx = 128
 Ny = Nx
 
-n_echo = 8
+n_echo = 2
 
 
 n_slices = 1
@@ -47,10 +47,10 @@ output_path = "/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/ou
 
 # ======
 # MRE PARAMETERS
-# ======
+# ======é
 mre_exc_freq       = 500.0        # single mechanical excitation frequency [Hz]
 mre_wave_period    = 1 / mre_exc_freq
-mre_n_timesteps    = 2            # number of phase offsets (time steps) over one wave period
+mre_n_timesteps    = 8            # number of phase offsets (time steps) over one wave period
 mre_meg_cycles     = 3           # number of MEG cycles (bipolar gradient pairs)
 mre_meg_orientations =  ['y']        #['x', 'y', 'z']
 mre_exp_number     = 10            # experiment number encoded in trigger pulse width
@@ -386,7 +386,7 @@ tt = rt + ft + meg_lobe_plus.fall_time
 
 times = [0]
 amps = [0]
-amps_neg = [0]
+amps_neg = [-0.0]
 
 current_t = 0
 
@@ -409,7 +409,7 @@ for i in range(mre_meg_cycles):
     current_t += rt
     times.append(current_t)
     amps.append(0)
-    amps_neg.append(0)
+    amps_neg.append(-0.0)
 
     # ramp up
     current_t += rt
@@ -427,7 +427,7 @@ for i in range(mre_meg_cycles):
     current_t += rt
     times.append(current_t)
     amps.append(0)
-    amps_neg.append(0)
+    amps_neg.append(-0.0)
 
 meg = pp.make_extended_trapezoid(
     channel='x',
@@ -503,6 +503,134 @@ if tr_delay < 0:
 else:
     print(f'TR delay: {1000 * tr_delay} ms')
 
+
+# ======
+# SEQUENCE Function
+# ======
+def add_echo_train(seq, meg, delay_timestep, i_excitation, i_slice, last_polarity):
+    rf_ex.freq_offset = (
+        gs_ex.amplitude
+        * slice_thickness
+        * (i_slice - (n_slices - 1) / 2)
+    )
+
+    rf_ref.freq_offset = (
+        gs_ref.amplitude
+        * slice_thickness
+        * (i_slice - (n_slices - 1) / 2)
+    )
+
+    rf_ex.phase_offset = (
+        rf_ex_phase
+        - 2 * np.pi * rf_ex.freq_offset * pp.calc_rf_center(rf_ex)[0]
+    )
+
+    rf_ref.phase_offset = (
+        rf_ref_phase
+        - 2 * np.pi * rf_ref.freq_offset * pp.calc_rf_center(rf_ref)[0]
+    )
+    #seq.add_block(pp.make_label(type='SET', label='SEG', value=0))
+    if FLAG_TRIG:
+        seq.add_block(trig_out)
+    if delay_timestep>0:
+            seq.add_block(pp.make_delay(delay_timestep))
+
+    # Excitation
+    if FLAG_LOOP_LABEL:
+        if delay_timestep>0:
+            seq.add_block(gs1)
+        else:
+        #seq.add_block(gs1,pp.make_label(type='SET', label='SEG', value=1))
+            seq.add_block(gs1)
+    else:
+        seq.add_block(gs1)
+    seq.add_block(rf_ex, gs2)
+    if FLAG_MRE:
+        if FLAG_LOOP_LABEL:
+            #seq.add_block(gs3, meg, gr3,pp.make_label(type='SET', label='SEG', value=0))
+            seq.add_block(gs3, meg, gr3)
+        else:                    
+            seq.add_block(gs3, meg, gr3)
+    else:
+        if FLAG_LOOP_LABEL:
+            #seq.add_block(gs3, gr3,pp.make_label(type='SET', label='SEG', value=0))
+            seq.add_block(gs3, gr3)
+        else:
+            seq.add_block(gs3, gr3)
+    #seq.add_block(pp.make_label(type='SET', label='SEG', value=0))
+    # Echo train
+    for i_echo in range(n_echo):
+
+        if i_excitation > 0:
+            phase_area = phase_areas[i_echo, i_excitation - 1]
+        else:
+            phase_area = 0.0
+
+        gp_pre = pp.make_trapezoid(
+            channel='y',
+            system=system,
+            area=phase_area,
+            duration=t_sp,
+            rise_time=dG,
+        )
+
+        gp_rew = pp.make_trapezoid(
+            channel='y',
+            system=system,
+            area=-phase_area,
+            duration=t_sp,
+            rise_time=dG,
+        ) 
+        if FLAG_LOOP_LABEL:
+            #seq.add_block(rf_ref, gs4 ,pp.make_label(type='SET', label='ECO', value=1))
+            seq.add_block(rf_ref, gs4)
+        else:
+            seq.add_block(rf_ref, gs4)
+        seq.add_block(gr5, gp_pre, gs5)
+
+        if i_excitation > 0:
+            seq.add_block(gr6, adc)
+        else:
+            seq.add_block(gr6)
+
+        if FLAG_LOOP_LABEL:
+            #seq.add_block(gr7, gp_rew, gs7,pp.make_label(type='SET', label='ECO', value=0))
+            seq.add_block(gr7, gp_rew, gs7)
+        else:
+            seq.add_block(gr7, gp_rew, gs7)
+    if FLAG_LOOP_LABEL:
+        #seq.add_block(gs4,pp.make_label(type='SET', label='REP', value=1))
+        seq.add_block(gs4)
+    else:
+        seq.add_block(gs4)
+    seq.add_block(gs5)
+
+    delay = tr_delay
+
+    if delay_timestep>0:
+            #if (delay - delay_timestep)>0:
+            delay -= delay_timestep
+            if last_polarity:
+                if i_excitation == n_ex:
+                    if i_echo == n_echo - 1:
+                        delay -= mre_wave_period / mre_n_timesteps
+                
+    seq.add_block(pp.make_delay(delay))
+                  
+    #if FLAG_LOOP_LABEL:
+        #seq.add_block(pp.make_label(type='SET', label='REP', value=0))
+
+
+
+
+
+
+
+
+
+
+
+
 # ======
 # CONSTRUCT SEQUENCE
 # ======
@@ -515,180 +643,28 @@ for n_dim, meg_orientation in enumerate(mre_meg_orientations):
 
     for idx_timesteps in range(mre_n_timesteps):
 
-        delay_timestep = idx_timesteps / mre_n_timesteps * mre_wave_period
+        delay_timestep = (idx_timesteps / mre_n_timesteps)* mre_wave_period
         #seq.add_block(pp.make_delay(delay_timestep))
 
         # Loop over slices
         for i_excitation in range(n_ex + 1):
 
             for i_slice in range(n_slices):
-
-                rf_ex.freq_offset = (
-                    gs_ex.amplitude
-                    * slice_thickness
-                    * (i_slice - (n_slices - 1) / 2)
-                )
-
-                rf_ref.freq_offset = (
-                    gs_ref.amplitude
-                    * slice_thickness
-                    * (i_slice - (n_slices - 1) / 2)
-                )
-
-                rf_ex.phase_offset = (
-                    rf_ex_phase
-                    - 2 * np.pi * rf_ex.freq_offset * pp.calc_rf_center(rf_ex)[0]
-                )
-
-                rf_ref.phase_offset = (
-                    rf_ref_phase
-                    - 2 * np.pi * rf_ref.freq_offset * pp.calc_rf_center(rf_ref)[0]
-                )
-                #seq.add_block(pp.make_label(type='SET', label='SEG', value=0))
-                if FLAG_TRIG:
-                    seq.add_block(trig_out)
-                if delay_timestep>0:
-                        seq.add_block(pp.make_delay(delay_timestep))
-
-                # Excitation
                 if FLAG_LOOP_LABEL:
-                    seq.add_block(gs1,pp.make_label(type='SET', label='SEG', value=1))
-                else:
-                    seq.add_block(gs1)
-                seq.add_block(rf_ex, gs2)
-                if FLAG_MRE:
-                    if FLAG_LOOP_LABEL:
-                        seq.add_block(gs3, meg, gr3,pp.make_label(type='SET', label='SEG', value=0))
-                    else:                    
-                        seq.add_block(gs3, meg, gr3)
-                else:
-                    if FLAG_LOOP_LABEL:
-                        seq.add_block(gs3, gr3,pp.make_label(type='SET', label='SEG', value=0))
-                    else:
-                        seq.add_block(gs3, gr3)
-                #seq.add_block(pp.make_label(type='SET', label='SEG', value=0))
-                # Echo train
-                for i_echo in range(n_echo):
-
-                    if i_excitation > 0:
-                        phase_area = phase_areas[i_echo, i_excitation - 1]
-                    else:
-                        phase_area = 0.0
-
-                    gp_pre = pp.make_trapezoid(
-                        channel='y',
-                        system=system,
-                        area=phase_area,
-                        duration=t_sp,
-                        rise_time=dG,
-                    )
-
-                    gp_rew = pp.make_trapezoid(
-                        channel='y',
-                        system=system,
-                        area=-phase_area,
-                        duration=t_sp,
-                        rise_time=dG,
-                    ) 
-                    if FLAG_LOOP_LABEL:
-                        seq.add_block(rf_ref, gs4 ,pp.make_label(type='SET', label='ECO', value=1))
-                    else:
-                        seq.add_block(rf_ref, gs4)
-                    seq.add_block(gr5, gp_pre, gs5)
-
-                    if i_excitation > 0:
-                        seq.add_block(gr6, adc)
-                    else:
-                        seq.add_block(gr6)
-
-                    if FLAG_LOOP_LABEL:
-                        seq.add_block(gr7, gp_rew, gs7,pp.make_label(type='SET', label='ECO', value=0))
-                    else:
-                        seq.add_block(gr7, gp_rew, gs7)
-                if FLAG_LOOP_LABEL:
-                    seq.add_block(gs4,pp.make_label(type='SET', label='REP', value=1))
-                else:
-                    seq.add_block(gs4)
-                seq.add_block(gs5)
-                if delay_timestep>0:
-                        if (tr_delay - delay_timestep)>0:
-                            seq.add_block(pp.make_delay(tr_delay - delay_timestep))
-                else:
-                    seq.add_block(pp.make_delay(tr_delay))
-                if FLAG_LOOP_LABEL:
-                    seq.add_block(pp.make_label(type='SET', label='REP', value=0))
+                    seq.add_block(pp.make_label(type='SET', label='SMS', value=1))
+                add_echo_train(seq, meg, delay_timestep, i_excitation, i_slice, (True*FLAG_MRE_BIPOLAR)==0)
+                #if (True*FLAG_MRE_BIPOLAR)==0:
+                    #seq.add_block(pp.make_label(type='SET', label='REP', value=0))
+                seq.add_block(pp.make_label(type='SET', label='SMS', value=0))
                 if FLAG_MRE_BIPOLAR:
+                    seq.add_block(pp.make_label(type='SET', label='SMS', value=1))
+                    add_echo_train(seq, meg_neg, delay_timestep, i_excitation, i_slice, True)
                     if FLAG_LOOP_LABEL:
-                        seq.add_block(pp.make_label(type='SET', label='SEG', value=1))
-                    if FLAG_TRIG:
-                        seq.add_block(trig_out)
-                    # Excitation
-                    if delay_timestep>0:
-                            seq.add_block(pp.make_delay(delay_timestep))
-                    seq.add_block(gs1)
-                    seq.add_block(rf_ex, gs2)
-                    if FLAG_MRE:
-                        seq.add_block(gs3,meg_neg, gr3)
-                    else:
-                        seq.add_block(gs3, gr3)
-                    
-                    # Echo train
-                    for i_echo in range(n_echo):
-                        if i_excitation > 0:
-                            phase_area = phase_areas[i_echo, i_excitation - 1]
-                        else:
-                            phase_area = 0.0
-
-                        gp_pre = pp.make_trapezoid(
-                            channel='y',
-                            system=system,
-                            area=phase_area,
-                            duration=t_sp,
-                            rise_time=dG,
-                        )
-
-                        gp_rew = pp.make_trapezoid(
-                            channel='y',
-                            system=system,
-                            area=-phase_area,
-                            duration=t_sp,
-                            rise_time=dG,
-                        )
-                        if FLAG_LOOP_LABEL:
-                            if (i_echo == 0):
-                                seq.add_block(rf_ref, gs4 ,pp.make_label(type='SET', label='SEG', value=0), pp.make_label(type='SET', label='REP', value=1))
-                            else:
-                                seq.add_block(rf_ref, gs4 ,pp.make_label(type='SET', label='REP', value=1))
-                        else:
-                            seq.add_block(rf_ref, gs4)
-                        seq.add_block(gr5, gp_pre, gs5)
-
-                        if i_excitation > 0:
-                            seq.add_block(gr6, adc)
-                        else:
-                            seq.add_block(gr6)
-
-                        seq.add_block(gr7, gp_rew, gs7)
-
-                    seq.add_block(gs4)
-                    seq.add_block(gs5)
-
-                    delay = tr_delay
-
-                    # retrieve the delay of the timestep
-                    if delay_timestep > 0:
-                        delay -= delay_timestep
-
-                    # if last echo you adapt TR so that the rf is 1 TR away 
-                    if i_excitation == n_ex:
-                        if i_echo == n_echo - 1:
-                                delay -= mre_wave_period / mre_n_timesteps
-
-                    seq.add_block(pp.make_delay(delay))
-                    if FLAG_LOOP_LABEL:
-                        seq.add_block(pp.make_label(type='SET', label='REP', value=0))
-        
-
+                        seq.add_block(pp.make_label(type='SET', label='SMS', value=0))
+    
+    seq.add_block(pp.make_label(type='SET', label='SEG', value=1))
+    seq.add_block(pp.make_delay(delay_timestep))
+    seq.add_block(pp.make_label(type='SET', label='SEG', value=0))
 
 
 # ======
@@ -714,7 +690,6 @@ if FLAG_TEST_REPORT:
 # DEFINITIONS
 # ======
 
-#seq.set_definition(key='FLAG_SHOW_PLOTS', value=int(FLAG_SHOW_PLOTS))
 seq.set_definition(key='FLAG_TEST_REPORT', value=int(FLAG_TEST_REPORT))
 seq.set_definition(key='FLAG_WRITE_SEQ', value=int(FLAG_WRITE_SEQ))
 
@@ -725,8 +700,10 @@ seq.set_definition(key='FLAG_TRIG', value=int(FLAG_TRIG))
 seq.set_definition(key='FLAG_MRE_BIPOLAR', value=int(FLAG_MRE_BIPOLAR))
 seq.set_definition(key='FLAG_LOOP_LABEL', value=int(FLAG_LOOP_LABEL))
 
+
 seq.set_definition(key='FOV', value=[fov, fov, slice_thickness * n_slices])
 seq.set_definition(key='Name', value='tse')
+
 seq.set_definition(key='Matrix', value=[Nx, Ny, n_slices])
 
 seq.set_definition(key='nslices', value=n_slices)
@@ -792,7 +769,7 @@ if FLAG_SHOW_PLOTS:
 if FLAG_WRITE_SEQ:
 
     filename = (
-        f"1007_RAREMRE"
+        f"2407_SMS"
         f"_{Nx}"
         f"_{int(fov * 1e3)}mm"
         f"_ETL{n_echo}"
