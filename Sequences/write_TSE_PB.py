@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pypulseq as pp
 
 ## ce code fonctionne cette tse est adapté à bruker et à l'interpréteur
+
 def main(
     plot: bool = True,  
     test_report: bool = False,
