@@ -147,85 +147,58 @@ g_spoil_opt.delay=gro_sum.shape_dur
 g_tot = pp.add_gradients([gro_sum,g_spoil_opt],system=system)
 g_tot
 
+wavetest = np.arange(0,24000, 6000)
+wavetest = np.append(wavetest,[18000,12000,6000,0,0])
+
 g_arb = pp.make_arbitrary_grad('x', wave15, system=system,first=0,last=0, oversampling=True)
 
 # %%
 # add SG delay
-g_tot.delay = SGPoints*dwell
-g_arb.delay = SGPoints*dwell
+#g_tot.delay = SGPoints*dwell
+#g_arb.delay = SGPoints*dwell
 # %%
 # Delay_TR
 delay_TR = TR - (pp.calc_duration(rf)+
                  pp.calc_duration(g_tot))
 
-
-
-
 # %%
-scale_x = np.zeros((nProj),dtype=float)
-scale_y = np.zeros((nProj),dtype=float)
-scale_z = np.zeros((nProj),dtype=float)
+def cosine_wave(amplitude, duration, dt):
+    """
+    Simple onde en cosinus surélevé (raised-cosine) : monte de 0 à amplitude
+    puis redescend à 0 sur la durée totale.
+    """
+    n = max(int(round(duration / dt)), 1)
+    t = np.linspace(0, 1, n, endpoint=False)
+    wave = amplitude * (1 - np.cos(2 * np.pi * t)) / 2
+    return wave
 
 
+# ---------- Version OVERSAMPLED (dt = grad_raster_time/2) ----------
+dt_os = system.grad_raster_time / 2
+total_dur_os = pp.calc_duration(gro) + pp.calc_duration(g_spoil_opt)
 
-phi = np.linspace(0,2*pi,nProj)
+wave15_OS_cos = cosine_wave(gro.amplitude, total_dur_os, dt_os)
+wave15_OS_cos = np.append(wave15_OS_cos, [0])
+print("wave15_OS_cos", len(wave15_OS_cos))
 
-for ipro in range(nProj): # 2D
-    scale_x[ipro] = np.cos(phi[ipro])
-    scale_y[ipro] = np.sin(phi[ipro])
-    scale_z[ipro] = 0
-
-scale_x
-
-# %% [markdown]
-# 2. reorder with 1D golden angle
-
-# %%
-if reord_traj == "golden":
-    print("reorder : gold")
-    scale_x_tmp = scale_x.copy()
-    scale_y_tmp = scale_y.copy()
-    scale_z_tmp = scale_z.copy()
-
-    index = 0
-    for ipro in range(nProj): # 2D
-        if ipro == (nProj-1):
-            index = 0
-        else:
-            index = int(np.ceil(np.mod((nProj-(ipro+1))*((ipro+1)*(np.sqrt(5.0)-1) / 3.0),nProj-(ipro+1))))
-
-        scale_x[ipro] = scale_x_tmp[index]
-        scale_y[ipro] = scale_y_tmp[index]
-        scale_z[ipro] = scale_z_tmp[index]
-
-        np.delete(scale_x_tmp,index)
-        np.delete(scale_y_tmp,index)
-        np.delete(scale_z_tmp,index)
-elif reord_traj == "segment":
-    print("reorder : segment")
-    scale_x_tmp = scale_x.copy()
-    scale_y_tmp = scale_y.copy()
-    scale_z_tmp = scale_z.copy()
-
-    index = 0
-    for seg in range(int(nProj/nSeg)): # 2D
-        #print(seg)
-        for ipro in np.arange(seg,nProj,int(nProj/nSeg)): # 2D
-            #print(ipro)
-            scale_x[index] = scale_x_tmp[ipro]
-            scale_y[index] = scale_y_tmp[ipro]
-            scale_z[index] = scale_z_tmp[ipro]
-
-            index = index + 1
+g_arb1_cos = pp.make_arbitrary_grad('x', wave15_OS_cos, system=system, first=0, last=0, oversampling=True)
 
 
+# ---------- Version STANDARD (dt = grad_raster_time) ----------
+dt_std = system.grad_raster_time
+total_dur_std = total_dur_os
 
+wave15_cos = cosine_wave(gro.amplitude, total_dur_std, dt_std)
+wave15_cos = np.append(wave15_cos, [0])
+print("wave15_cos", len(wave15_cos))
+
+g_arb0_cos = pp.make_arbitrary_grad('x', wave15_cos, system=system, first=0, last=0, oversampling=False)
 # %% [markdown]
 # # Write real sequence
 
 # %%
 g_arb_y = copy.deepcopy(g_arb)
-g_arb_z = copy.deepcopy(g_arb)
+g_arb_z = copy.deepcopy(g_arb1_cos)
 g_arb_y.channel='y'
 g_arb_z.channel='z'
 
@@ -244,9 +217,10 @@ for i in range(nProj):
   rf_phase = np.mod(rf_phase + rf_inc, 360.0)
 
   seq.add_block(rf)
-  seq.add_block(adc,pp.scale_grad(grad = g_arb, scale=scale_x[ipro]),pp.scale_grad(grad = g_arb_y, scale=scale_y[ipro]),pp.scale_grad(grad = g_arb_z, scale=scale_y[ipro]))
+  seq.add_block(pp.scale_grad(grad = g_arb, scale=1),pp.scale_grad(grad = g_arb_y, scale=1),pp.scale_grad(grad = g_arb_z, scale=1))
   ipro = ipro + 1
-
+  seq.add_block(pp.make_delay(delay_TR))
+  seq.add_block(adc)
   seq.add_block(pp.make_delay(delay_TR))
 
 # %%
@@ -254,11 +228,20 @@ for i in range(nProj):
 
 # %%
 if FLAG_PLOT:
-  seq.plot(grad_disp="mT/m",show_blocks=True,time_disp="s",label="SET,PAR")
+  seq.plot(grad_disp="mT/m",time_disp="ms")
 
 
 # %%
-seq.check_timing()
+# Vérification du timing
+ok, error_report = seq.check_timing()
+
+if ok:
+    print("La vérification du timing a réussi !")
+else:
+    print("La vérification du timing a échoué ! Voici les erreurs :")
+    # error_report est une liste de chaînes de caractères
+    for error in error_report:
+        print(error)
 
 
 

@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 
 ### Flag
-FLAG_WRITE_SEQ = False
+FLAG_WRITE_SEQ = True
 FLAG_PLOT = True
 
 
@@ -23,7 +23,7 @@ system = pp.Opts(
     slew_unit="T/m/s",
     rf_ringdown_time=20e-6,
     rf_dead_time=100e-6,
-    adc_dead_time=10e-6,
+    adc_dead_time=100e-6,
     grad_raster_time=10e-6
 )
 
@@ -201,6 +201,39 @@ wave5 = np.append(wave5,0)
 wave15= np.concatenate((wave14, wave5))
 
 g_arb0 = pp.make_arbitrary_grad('x', wave15, system=system,first=0,last=0, oversampling=False)
+
+#%%
+def cosine_wave(amplitude, duration, dt):
+    """
+    Simple onde en cosinus surélevé (raised-cosine) : monte de 0 à amplitude
+    puis redescend à 0 sur la durée totale.
+    """
+    n = max(int(round(duration / dt)), 1)
+    t = np.linspace(0, 1, n, endpoint=False)
+    wave = amplitude * (1 - np.cos(2 * np.pi * t)) / 2
+    return wave
+
+
+# ---------- Version OVERSAMPLED (dt = grad_raster_time/2) ----------
+dt_os = system.grad_raster_time / 2
+total_dur_os = pp.calc_duration(gro) + pp.calc_duration(g_spoil_opt)
+
+wave15_OS_cos = cosine_wave(gro.amplitude, total_dur_os, dt_os)
+wave15_OS_cos = np.append(wave15_OS_cos, [0])
+print("wave15_OS_cos", len(wave15_OS_cos))
+
+g_arb1_cos = pp.make_arbitrary_grad('x', wave15_OS_cos, system=system, first=0, last=0, oversampling=True)
+
+
+# ---------- Version STANDARD (dt = grad_raster_time) ----------
+dt_std = system.grad_raster_time
+total_dur_std = total_dur_os
+
+wave15_cos = cosine_wave(gro.amplitude, total_dur_std, dt_std)
+wave15_cos = np.append(wave15_cos, [0])
+print("wave15_cos", len(wave15_cos))
+
+g_arb0_cos = pp.make_arbitrary_grad('x', wave15_cos, system=system, first=0, last=0, oversampling=False)
 # %%
 # add SG delay
 g_tot.delay = SGPoints*dwell
@@ -219,13 +252,13 @@ delay_TR = TR - (pp.calc_duration(rf)+
 # # Write real sequence
 
 # %%
-g_arb1_y = copy.deepcopy(g_arb1)
+g_arb1_y = copy.deepcopy(g_arb1_cos)
 g_arb1_z = copy.deepcopy(g_arb1)
 g_arb1_y.channel='y'
 g_arb1_z.channel='z'
 
 
-g_arb0_y = copy.deepcopy(g_arb0)
+g_arb0_y = copy.deepcopy(g_arb0_cos)
 g_arb0_z = copy.deepcopy(g_arb0)
 g_arb0_y.channel='y'
 g_arb0_z.channel='z'
@@ -243,24 +276,23 @@ ipro = 0
 rf_phase = 0
 rf_inc = 0
 #for i in range(nProj + nDummy): //Real one
+
 rf.phase_offset = rf_phase / 180 * np.pi
 rf.phase_offset = rf_phase / 180 * np.pi
 adc.phase_offset = rf_phase / 180 * np.pi
 rf_inc = np.mod(rf_inc + rf_spoiling_inc, 360.0)
 rf_phase = np.mod(rf_phase + rf_inc, 360.0)
 
-seq.add_block(rf)
-seq.add_block(pp.scale_grad(grad = g_arb1, scale=1),pp.scale_grad(grad = g_arb1_y, scale=0.5),pp.scale_grad(grad = g_arb1_z, scale=0.75))
-seq.add_block(pp.scale_grad(grad = g_arb1, scale=-1),pp.scale_grad(grad = g_arb1_y, scale=-0.5),pp.scale_grad(grad = g_arb1_z, scale=-0.75))
-seq.add_block(pp.make_delay(np.ceil((TR - (pp.calc_duration(rf) + 2*pp.calc_duration(g_arb1)))/ seq.grad_raster_time)*seq.grad_raster_time))
 
 seq.add_block(rf)
 seq.add_block(pp.scale_grad(grad = g_arb1, scale=1),pp.scale_grad(grad = g_arb1_y, scale=0.5),pp.scale_grad(grad = g_arb1_z, scale=0.75))
+#seq.add_block(pp.make_delay(1e-3))
 seq.add_block(pp.scale_grad(grad = g_arb1, scale=-1),pp.scale_grad(grad = g_arb1_y, scale=-0.5),pp.scale_grad(grad = g_arb1_z, scale=-0.75))
 seq.add_block(pp.make_delay(np.ceil((TR - (pp.calc_duration(rf) + 2*pp.calc_duration(g_arb1)))/ seq.grad_raster_time)*seq.grad_raster_time))
 
 seq.add_block(rf)
 seq.add_block(pp.scale_grad(grad = g_arb0, scale=1),pp.scale_grad(grad = g_arb0_y, scale=0.5),pp.scale_grad(grad = g_arb0_z, scale=0.75))
+#seq.add_block(pp.make_delay(1e-3))
 seq.add_block(pp.scale_grad(grad = g_arb0, scale=-1),pp.scale_grad(grad = g_arb0_y, scale=-0.5),pp.scale_grad(grad = g_arb0_z, scale=-0.75))
 #seq.add_block(pp.make_delay(np.ceil((TR - (pp.calc_duration(rf) + 2*pp.calc_duration(g_arb0)))/ seq.grad_raster_time)*seq.grad_raster_time))
 
@@ -318,7 +350,7 @@ gy_trap_pre.area *= -1
 
 seq.add_block(gx_trap_pre, gy_trap_pre, gz_trap_reph)
 #seq.add_block(pp.make_delay(delay_TE))
-seq.add_block(gx_trap, adc_trap)
+seq.add_block(gx_trap, adc)
 gy_trap_pre.amplitude = -gy_trap_pre.amplitude
 seq.add_block(pp.make_delay(delay_TR), gx_trap_spoil, gy_trap_pre, gz_trap_spoil)
 
@@ -349,8 +381,8 @@ seq.set_definition("adc_dead_time",system.adc_dead_time)
 # paramètres modifiable
 seq.set_definition("FOV",fov)
 
-N2 = [N,N]
-seq.set_definition("matrix",N2)
+N2 = [N,N,1]
+seq.set_definition("Matrix",N2)
 seq.set_definition("alpha",alpha)
 seq.set_definition("TR",TR*1e3)
 seq.set_definition("nProj",nProj)
@@ -366,6 +398,7 @@ seq.set_definition("rf_len",rf_len)
 seq.set_definition("rf_spoiling_inc",rf_spoiling_inc)
 seq.set_definition("ro_spoil",ro_spoil)
 seq.set_definition("ro_os",ro_os)
+seq.set_definition(key='AdcDeadTime', value=system.adc_dead_time)
 
 # param faciliter la reco
 seq.set_definition("nSample",Ns)
@@ -380,7 +413,7 @@ print("date and time =", dt_string)
 # %%
 if FLAG_WRITE_SEQ:
   output_path = '/workspace_QMRI/PROJECTS_DATA/2026_RECH_bruker_pulseq/pypulseq/python/Test_unitaire/Gradient_polarity/ouput'
-  seq_filename = "All_in.seq"
+  seq_filename = "All_in_cos.seq"
   seq.write(str(output_path+"/"+seq_filename),remove_duplicates=False)
 
 
